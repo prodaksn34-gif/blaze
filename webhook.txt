@@ -1,0 +1,1 @@
+bot.set_webhook(url="https://https://github.com/prodaksn34-gif/blaze/TELEGRAM_TOKEN")
