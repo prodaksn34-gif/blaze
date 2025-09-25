@@ -1,20 +1,18 @@
 import os
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from flask import Flask, request
+from telegram import Update, Bot
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, filters, ContextTypes
 import openai
-from flask import Flask
-import threading
 
 # Flask для Render
 server = Flask(__name__)
 
-@server.route("/")
-def home():
-    return "Блейз бот работает!"
-
-# Telegram/OpenAI ключи из переменных окружения
+# Ключи из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+bot = Bot(token=TELEGRAM_TOKEN)
+dispatcher = Dispatcher(bot, None, workers=0)
 
 openai.api_key = OPENAI_API_KEY
 
@@ -22,7 +20,7 @@ openai.api_key = OPENAI_API_KEY
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет. Я Блейз. Строгий и рассудительный собеседник.")
 
-# Обработка сообщений
+# Обработка текстовых сообщений через OpenAI
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
 
@@ -40,15 +38,24 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(reply)
 
-# Основная функция
-def main():
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
-    print("Блейз запущен")
-    app.run_polling()
+# Регистрируем обработчики
+dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-# Запуск Telegram + Flask
+# Webhook для Telegram
+@server.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
+    return "ok"
+
+# Главная страница
+@server.route("/")
+def home():
+    return "Блейз бот работает!"
+
 if __name__ == "__main__":
-    threading.Thread(target=main).start()
+    # Устанавливаем webhook
+    bot.set_webhook(url=f"https://blaze-1-rxpr.onrender.com/{TELEGRAM_TOKEN}")
+    # Запускаем Flask
     server.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
