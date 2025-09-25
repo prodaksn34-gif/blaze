@@ -60,4 +60,7 @@ if __name__ == "__main__":
     async def set_webhook():
         await app_telegram.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
 
-    asyncio.ge
+    asyncio.get_event_loop().run_until_complete(set_webhook())
+
+    # Запускаем Flask-сервер
+    server.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
