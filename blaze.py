@@ -1,9 +1,9 @@
 import os
+import asyncio
 from flask import Flask, request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 import openai
-import asyncio
 
 # Flask
 server = Flask(__name__)
@@ -11,11 +11,9 @@ server = Flask(__name__)
 # Ключи
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
 openai.api_key = OPENAI_API_KEY
 
 # --- Telegram обработчики ---
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет. Я Блейз. Строгий и рассудительный собеседник.")
 
@@ -35,12 +33,12 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(reply)
 
-# --- Создание Telegram Application ---
+# --- Telegram Application ---
 app_telegram = Application.builder().token(TELEGRAM_TOKEN).build()
 app_telegram.add_handler(CommandHandler("start", start))
 app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-# --- Flask routes ---
+# --- Flask ---
 @server.route("/")
 def home():
     return "Блейз бот работает!"
@@ -51,13 +49,11 @@ def webhook():
     asyncio.run(app_telegram.process_update(update))
     return "ok"
 
-# --- Установка webhook при старте ---
+# --- Установка webhook ---
 async def set_webhook():
     url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/{TELEGRAM_TOKEN}"
     await app_telegram.bot.set_webhook(url)
 
 if __name__ == "__main__":
-    # Устанавливаем webhook
     asyncio.run(set_webhook())
-    # Запускаем Flask
     server.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
