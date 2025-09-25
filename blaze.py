@@ -1,31 +1,26 @@
 import os
+from flask import Flask, request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 import openai
-from flask import Flask
-import threading
+import asyncio
 
-# Flask для Render
+# Flask
 server = Flask(__name__)
 
-@server.route("/")
-def home():
-    return "Блейз бот работает!"
-
-# Telegram/OpenAI ключи из переменных окружения
+# Ключи
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 openai.api_key = OPENAI_API_KEY
 
-# Команда /start
+# --- Telegram обработчики ---
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет. Я Блейз. Строгий и рассудительный собеседник.")
 
-# Обработка сообщений
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
-
     try:
         response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -40,15 +35,29 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(reply)
 
-# Основная функция
-def main():
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
-    print("Блейз запущен")
+# --- Создание Telegram Application ---
+app_telegram = Application.builder().token(TELEGRAM_TOKEN).build()
+app_telegram.add_handler(CommandHandler("start", start))
+app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-# Запуск Telegram + Flask
+# --- Flask routes ---
+@server.route("/")
+def home():
+    return "Блейз бот работает!"
+
+@server.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), app_telegram.bot)
+    asyncio.run(app_telegram.process_update(update))
+    return "ok"
+
+# --- Установка webhook при старте ---
+async def set_webhook():
+    url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/{TELEGRAM_TOKEN}"
+    await app_telegram.bot.set_webhook(url)
+
 if __name__ == "__main__":
-    threading.Thread(target=main).start()
+    # Устанавливаем webhook
+    asyncio.run(set_webhook())
+    # Запускаем Flask
     server.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
