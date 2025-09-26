@@ -1,1 +1,2 @@
-web: python blaze.py
+worker: python blaze.py
+web: python -m http.server $PORT
