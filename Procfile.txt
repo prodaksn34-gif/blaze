@@ -1,1 +1,1 @@
-worker: python blaze.py
+web: python blaze.py
